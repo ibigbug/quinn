@@ -1,7 +1,8 @@
 use std::{fmt, num::TryFromIntError, sync::Arc, time::Duration};
 
+#[cfg(feature = "rustls")]
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
 use thiserror::Error;
-
 #[cfg(feature = "ring")]
 use rand::RngCore;
 
@@ -829,8 +830,8 @@ impl ServerConfig {
     ///
     /// Uses a randomized handshake token key.
     pub fn with_single_cert(
-        cert_chain: Vec<rustls::Certificate>,
-        key: rustls::PrivateKey,
+        cert_chain: Vec<CertificateDer<'static>>,
+        key: PrivateKeyDer<'static>,
     ) -> Result<Self, rustls::Error> {
         let crypto = crypto::rustls::server_config(cert_chain, key)?;
         Ok(Self::with_crypto(Arc::new(crypto)))
@@ -914,7 +915,7 @@ impl ClientConfig {
         match rustls_native_certs::load_native_certs() {
             Ok(certs) => {
                 for cert in certs {
-                    if let Err(e) = roots.add(&rustls::Certificate(cert.0)) {
+                    if let Err(e) = roots.add(cert) {
                         tracing::warn!("failed to parse trust anchor: {}", e);
                     }
                 }
