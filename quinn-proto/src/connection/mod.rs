@@ -1812,10 +1812,25 @@ impl Connection {
             false,
             false,
         );
+
         self.process_decrypted_packet(now, remote, Some(packet_number), packet)?;
         if let Some(data) = remaining {
             self.handle_coalesced(now, remote, ecn, data);
         }
+
+        if self.highest_space == SpaceId::Initial && self.state.is_handshake() {
+            // "The payload of an Initial packet includes a CRYPTO frame (or frames) containing a
+            // cryptographic handshake message, ACK frames, or both."
+            // https://www.rfc-editor.org/rfc/rfc9000.html#section-17.2.2
+            let space = &self.spaces[SpaceId::Initial];
+            if space.crypto_stream.bytes_read() == 0 {
+                return Err(TransportError::PROTOCOL_VIOLATION(
+                    "received initial packet without CRYPTO frames",
+                )
+                .into());
+            }
+        }
+
         Ok(())
     }
 
